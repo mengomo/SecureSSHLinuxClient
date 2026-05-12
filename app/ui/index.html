@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZFCS SSH CA Console</title>
+  <style>
+    :root {
+      --bg: #f1eadc;
+      --panel: #fff9ef;
+      --panel-strong: #f6edd8;
+      --ink: #182028;
+      --muted: #635d54;
+      --accent: #1d5f70;
+      --accent-soft: #d6e6df;
+      --border: #d8cab2;
+      --danger: #8d2f2f;
+      --success: #2f6a41;
+      --shadow: 0 18px 40px rgba(24, 32, 40, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(29, 95, 112, 0.14), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(114, 74, 29, 0.14), transparent 32%),
+        var(--bg);
+    }
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .hero-panel, .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+    .hero-panel {
+      padding: 24px;
+    }
+    .title {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 62ch;
+      line-height: 1.55;
+    }
+    .token-box {
+      padding: 20px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 18px;
+    }
+    .topology {
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .machine-card {
+      background: linear-gradient(180deg, var(--panel), #fffdf7);
+    }
+    .machine-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+    .machine-head h3 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+    .machine-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .machine-list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+    .machine-list li {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px 13px;
+    }
+    .machine-list strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .machine-list code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      word-break: break-word;
+    }
+    .runtime-grid {
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .runtime-card h3 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .runtime-card p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .runtime-empty {
+      color: var(--muted);
+      font-size: 14px;
+      background: #fff;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .asset-list {
+      display: grid;
+      gap: 10px;
+    }
+    .asset-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 13px;
+    }
+    .asset-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .asset-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .asset-badge {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .asset-badge.ready {
+      background: #dff3e4;
+      color: var(--success);
+    }
+    .asset-badge.error {
+      background: #f6dddb;
+      color: var(--danger);
+    }
+    .asset-value {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .nav, .steps {
+      display: grid;
+      gap: 18px;
+    }
+    .card { padding: 18px; }
+    .nav h2, .steps h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .nav button {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      margin-bottom: 10px;
+    }
+    .nav button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .step {
+      display: none;
+      gap: 14px;
+    }
+    .step.active {
+      display: grid;
+    }
+    .step-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+    .step-title {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+    .step-copy {
+      color: var(--muted);
+      margin: 6px 0 0;
+      line-height: 1.55;
+    }
+    .pill {
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .full { grid-column: 1 / -1; }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font: inherit;
+      color: var(--ink);
+      background: #fffdf8;
+    }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: "IBM Plex Mono", monospace;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 16px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+    }
+    .btn.secondary {
+      background: #e8deca;
+      color: var(--ink);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .status {
+      min-height: 22px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .status.error { color: var(--danger); }
+    .status.success { color: var(--success); }
+    .panel-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .output {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .output h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    pre {
+      margin: 0;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 13px/1.5 "IBM Plex Mono", monospace;
+    }
+    .next-step {
+      border-left: 4px solid var(--accent);
+      background: #fff;
+      padding: 14px 16px;
+      border-radius: 12px;
+    }
+    .summary-list {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .summary-list strong {
+      display: inline-block;
+      min-width: 150px;
+    }
+    .small-note {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    @media (max-width: 960px) {
+      .hero, .grid, .form-grid, .topology, .runtime-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-panel">
+        <h1 class="title">ZFCS SSH CA Console</h1>
+        <p class="subtitle">
+          This console shows the full Broker-driven SSH certificate workflow. Nothing runs automatically:
+          each API step is triggered manually so you can inspect inputs, outputs, and the next command to run on endpoints.
+        </p>
+      </div>
+      <div class="hero-panel token-box">
+        <div class="panel-stack">
+          <label>
+            Bearer Token
+            <input id="token-input" type="password" placeholder="Paste client/server/admin token">
+          </label>
+          <div class="actions">
+            <button class="btn" id="save-token-btn">Use Token</button>
+            <button class="btn secondary" id="clear-token-btn">Clear</button>
+          </div>
+          <div class="summary-list">
+            <div><strong>Current token:</strong> <span id="token-state">not set</span></div>
+            <div><strong>Broker path:</strong> <span>/healthz, /v1/*, /v1/ui/*</span></div>
+          </div>
+          <div class="small-note">
+            The page itself is static. The token is only used for API calls from this browser session.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="topology">
+      <article class="card machine-card">
+        <div class="machine-head">
+          <div>
+            <h3>Client</h3>
+            <p>192.168.131.128 / blooze</p>
+          </div>
+          <div class="pill">User Side</div>
+        </div>
+        <ul class="machine-list">
+          <li><strong>Owns</strong><code>~/.ssh/id_ed25519</code> private key</li>
+          <li><strong>Gets</strong><code>~/.ssh/id_ed25519-cert.pub</code> user certificate from Broker</li>
+          <li><strong>Trusts</strong><code>@cert-authority 192.168.131.* &lt;host_ca_pub&gt;</code> in known_hosts</li>
+          <li><strong>Uses</strong>principal <code>rocky</code> or <code>root</code> to SSH into soc</li>
+        </ul>
+      </article>
+
+      <article class="card machine-card">
+        <div class="machine-head">
+          <div>
+            <h3>CA / Broker</h3>
+            <p>192.168.131.135 / root</p>
+          </div>
+          <div class="pill">Signer</div>
+        </div>
+        <ul class="machine-list">
+          <li><strong>Holds</strong><code>/root/.step/secrets/ssh_user_ca_key</code> and <code>/root/.step/secrets/ssh_host_ca_key</code></li>
+          <li><strong>Publishes</strong>user CA public key and host CA public key over HTTP</li>
+          <li><strong>Signs</strong>user certs with <code>ssh-keygen -s</code> for clients</li>
+          <li><strong>Signs</strong>host certs with <code>ssh-keygen -s -h</code> for servers</li>
+        </ul>
+      </article>
+
+      <article class="card machine-card">
+        <div class="machine-head">
+          <div>
+            <h3>soc / Server</h3>
+            <p>192.168.131.134 / liveuser</p>
+          </div>
+          <div class="pill">Host Side</div>
+        </div>
+        <ul class="machine-list">
+          <li><strong>Owns</strong><code>/etc/ssh/ssh_host_ed25519_key</code> private key</li>
+          <li><strong>Gets</strong><code>/etc/ssh/ssh_host_ed25519_key-cert.pub</code> host certificate from Broker</li>
+          <li><strong>Trusts</strong>user CA pubkey in <code>TrustedUserCAKeys</code></li>
+          <li><strong>Accepts</strong>user cert logins for local accounts like <code>rocky</code> and <code>root</code></li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="runtime-grid">
+      <article class="card runtime-card">
+        <h3>Client Runtime State</h3>
+        <p>Only assets created or fetched during this browser session are shown.</p>
+        <div id="runtime-client"></div>
+      </article>
+      <article class="card runtime-card">
+        <h3>CA / Broker Runtime State</h3>
+        <p>Broker-side metadata appears here when you trigger workflow steps.</p>
+        <div id="runtime-ca"></div>
+      </article>
+      <article class="card runtime-card">
+        <h3>soc / Server Runtime State</h3>
+        <p>Server trust material and host certificate assets appear here when created or fetched.</p>
+        <div id="runtime-server"></div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <aside class="nav card">
+        <h2>Workflow</h2>
+        <button class="active" data-step-target="step-health">1. Health & Version</button>
+        <button data-step-target="step-pubkeys">2. CA Public Keys</button>
+        <button data-step-target="step-user-sign">3. Sign User Cert</button>
+        <button data-step-target="step-host-sign">4. Sign Host Cert</button>
+      </aside>
+
+      <main class="steps">
+        <section class="card step active" id="step-health">
+          <div class="step-header">
+            <div>
+              <h2 class="step-title">Health & Version</h2>
+              <p class="step-copy">Check that the Broker is up and load the UI bootstrap summary for manual operation.</p>
+            </div>
+            <div class="pill">Read Only</div>
+          </div>
+          <div class="actions">
+            <button class="btn" id="health-btn">Run /healthz</button>
+            <button class="btn secondary" id="bootstrap-btn">Run /v1/ui/bootstrap</button>
+          </div>
+          <div id="health-status" class="status"></div>
+          <div class="panel-stack">
+            <div class="output">
+              <h3>Bootstrap Summary</h3>
+              <pre id="bootstrap-summary">No data yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Raw Response</h3>
+              <pre id="health-raw">No requests yet.</pre>
+            </div>
+            <div class="next-step">
+              After this succeeds, move to step 2 and fetch the host/user CA public keys you need for endpoint trust configuration.
+            </div>
+          </div>
+        </section>
+
+        <section class="card step" id="step-pubkeys">
+          <div class="step-header">
+            <div>
+              <h2 class="step-title">CA Public Keys</h2>
+              <p class="step-copy">Download the user CA and host CA public keys manually, inspect them, and copy the exact values needed on endpoints.</p>
+            </div>
+            <div class="pill">Manual Fetch</div>
+          </div>
+          <div class="actions">
+            <button class="btn" id="fetch-user-ca-btn">Get User CA Pubkey</button>
+            <button class="btn secondary" id="fetch-host-ca-btn">Get Host CA Pubkey</button>
+          </div>
+          <div id="pubkey-status" class="status"></div>
+          <div class="panel-stack">
+            <div class="output">
+              <h3>User CA Public Key</h3>
+              <pre id="user-ca-output">No data yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Host CA Public Key</h3>
+              <pre id="host-ca-output">No data yet.</pre>
+            </div>
+            <div class="next-step">
+              Server side: save the user CA pubkey under `/etc/ssh/trusted_user_ca_keys.pub` or the currently active trusted-user CA path. Client side: add the host CA pubkey to `known_hosts` using `@cert-authority`.
+            </div>
+          </div>
+        </section>
+
+        <section class="card step" id="step-user-sign">
+          <div class="step-header">
+            <div>
+              <h2 class="step-title">Sign User Certificate</h2>
+              <p class="step-copy">Paste the user public key, choose the principals, and trigger user certificate signing manually.</p>
+            </div>
+            <div class="pill">Client / Admin Token</div>
+          </div>
+          <div class="form-grid">
+            <label><span>Key ID</span><input id="user-key-id" value="blooze@192.168.131.128"></label>
+            <label><span>TTL</span><input id="user-ttl" value="24h"></label>
+            <label class="full"><span>Requested Principals (comma-separated)</span><input id="user-principals" value="rocky,root"></label>
+            <label><span>Caller Requester</span><input id="user-caller-requester" value="manual-ui"></label>
+            <label><span>Caller Source IP</span><input id="user-caller-source" value="192.168.131.128"></label>
+            <label class="full"><span>Caller Reason</span><input id="user-caller-reason" value="manual workflow step"></label>
+            <label class="full"><span>User Public Key</span><textarea id="user-public-key" placeholder="ssh-ed25519 AAAA..."></textarea></label>
+          </div>
+          <div class="actions">
+            <button class="btn secondary" id="demo-user-key-btn">Auto Fill Demo Public Key</button>
+            <button class="btn" id="sign-user-btn">Sign User Cert</button>
+            <button class="btn secondary" id="inspect-user-btn">Inspect Returned Cert</button>
+          </div>
+          <div id="user-status" class="status"></div>
+          <div class="panel-stack">
+            <div class="output">
+              <h3>Returned Certificate</h3>
+              <pre id="user-cert-output">No certificate yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Certificate Summary</h3>
+              <pre id="user-cert-summary">No inspection result yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Raw Response</h3>
+              <pre id="user-raw-output">No requests yet.</pre>
+            </div>
+            <div class="next-step">
+              Save the returned certificate as `~/.ssh/id_ed25519-cert.pub`, keep the matching private key as `~/.ssh/id_ed25519`, then use `IdentityFile` plus `CertificateFile` in SSH config.
+            </div>
+          </div>
+        </section>
+
+        <section class="card step" id="step-host-sign">
+          <div class="step-header">
+            <div>
+              <h2 class="step-title">Sign Host Certificate</h2>
+              <p class="step-copy">Paste the host public key, specify host principals, and trigger host certificate signing manually. The default SOC profile uses a 3-year host certificate.</p>
+            </div>
+            <div class="pill">Server / Admin Token</div>
+          </div>
+          <div class="form-grid">
+            <label><span>Key ID</span><input id="host-key-id" value="soc-192.168.131.134"></label>
+            <label><span>TTL</span><input id="host-ttl" value="1095d"></label>
+            <label class="full"><span>Requested Host Principals (comma-separated)</span><input id="host-principals" value="192.168.131.134"></label>
+            <label><span>Caller Requester</span><input id="host-caller-requester" value="manual-ui"></label>
+            <label><span>Caller Source IP</span><input id="host-caller-source" value="192.168.131.134"></label>
+            <label class="full"><span>Caller Reason</span><input id="host-caller-reason" value="manual workflow step"></label>
+            <label class="full"><span>Host Public Key</span><textarea id="host-public-key" placeholder="ssh-ed25519 AAAA..."></textarea></label>
+          </div>
+          <div class="actions">
+            <button class="btn secondary" id="demo-host-key-btn">Auto Fill Demo Host Public Key</button>
+            <button class="btn" id="sign-host-btn">Sign Host Cert</button>
+            <button class="btn secondary" id="inspect-host-btn">Inspect Returned Cert</button>
+          </div>
+          <div id="host-status" class="status"></div>
+          <div class="panel-stack">
+            <div class="output">
+              <h3>Returned Certificate</h3>
+              <pre id="host-cert-output">No certificate yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Certificate Summary</h3>
+              <pre id="host-cert-summary">No inspection result yet.</pre>
+            </div>
+            <div class="output">
+              <h3>Raw Response</h3>
+              <pre id="host-raw-output">No requests yet.</pre>
+            </div>
+            <div class="next-step">
+              Save the returned host certificate as `/etc/ssh/ssh_host_ed25519_key-cert.pub`, then point `HostCertificate` at it and reload `sshd`.
+            </div>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "zfcsshWorkflowState";
+    const state = {
+      token: sessionStorage.getItem("zfcsshToken") || "",
+      bootstrap: null,
+      userResponse: null,
+      hostResponse: null,
+      assets: (() => {
+        try {
+          return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+        } catch {
+          return {};
+        }
+      })(),
+    };
+
+    const byId = (id) => document.getElementById(id);
+
+    function setTokenDisplay() {
+      byId("token-state").textContent = state.token ? "loaded for this browser session" : "not set";
+      byId("token-input").value = state.token;
+    }
+
+    function setStatus(id, message, kind = "") {
+      const node = byId(id);
+      node.textContent = message;
+      node.className = `status ${kind}`.trim();
+    }
+
+    function pretty(value) {
+      if (typeof value === "string") return value;
+      return JSON.stringify(value, null, 2);
+    }
+
+    function saveWorkflowState() {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state.assets));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function asset(machine, key, status, label, value) {
+      if (!state.assets[machine]) state.assets[machine] = {};
+      state.assets[machine][key] = { status, label, value };
+      saveWorkflowState();
+      renderRuntimeState();
+    }
+
+    function renderRuntimeState() {
+      const sections = {
+        client: byId("runtime-client"),
+        ca: byId("runtime-ca"),
+        server: byId("runtime-server"),
+      };
+      for (const [machine, node] of Object.entries(sections)) {
+        const items = Object.values(state.assets[machine] || {});
+        if (!items.length) {
+          node.innerHTML = '<div class="runtime-empty">No runtime assets yet.</div>';
+          continue;
+        }
+        node.innerHTML = `<div class="asset-list">${items.map((item) => `
+          <div class="asset-item">
+            <div class="asset-head">
+              <div class="asset-name">${escapeHtml(item.label)}</div>
+              <div class="asset-badge ${escapeHtml(item.status)}">${escapeHtml(item.status.toUpperCase())}</div>
+            </div>
+            <div class="asset-value">${escapeHtml(item.value || "")}</div>
+          </div>
+        `).join("")}</div>`;
+      }
+    }
+
+    async function api(path, options = {}, requireToken = true) {
+      const headers = new Headers(options.headers || {});
+      if (requireToken) {
+        if (!state.token) throw new Error("Set a Bearer token first.");
+        headers.set("Authorization", `Bearer ${state.token}`);
+      }
+      if (options.body && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      const response = await fetch(path, { ...options, headers });
+      const text = await response.text();
+      let data;
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      if (!response.ok) {
+        const message = data.message || response.statusText;
+        const error = new Error(message);
+        error.payload = data;
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    }
+
+    function principalsFromInput(value) {
+      return value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+
+    function renderCertSummary(targetId, data) {
+      const summary = [
+        `Type: ${data.cert_type}`,
+        `Key ID: ${data.key_id}`,
+        `Serial: ${data.serial}`,
+        `Valid After: ${data.valid_after}`,
+        `Valid Before: ${data.valid_before}`,
+        `Principals: ${data.principals.join(", ") || "(none)"}`,
+        `Signing CA: ${data.signing_ca_fingerprint}`,
+      ].join("\n");
+      byId(targetId).textContent = summary + "\n\nRaw inspection output:\n" + data.raw_output;
+    }
+
+    async function inspectCertificate(certificate, outputId, statusId) {
+      if (!certificate) {
+        setStatus(statusId, "No certificate available to inspect.", "error");
+        return;
+      }
+      try {
+        const data = await api("/v1/ui/inspect-cert", {
+          method: "POST",
+          body: JSON.stringify({ certificate }),
+        });
+        renderCertSummary(outputId, data);
+        setStatus(statusId, "Certificate inspection completed.", "success");
+      } catch (error) {
+        byId(outputId).textContent = pretty(error.payload || { message: error.message });
+        setStatus(statusId, error.message, "error");
+      }
+    }
+
+    document.querySelectorAll("[data-step-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-step-target]").forEach((item) => item.classList.remove("active"));
+        document.querySelectorAll(".step").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        byId(button.dataset.stepTarget).classList.add("active");
+      });
+    });
+
+    byId("save-token-btn").addEventListener("click", () => {
+      state.token = byId("token-input").value.trim();
+      sessionStorage.setItem("zfcsshToken", state.token);
+      setTokenDisplay();
+    });
+
+    byId("clear-token-btn").addEventListener("click", () => {
+      state.token = "";
+      sessionStorage.removeItem("zfcsshToken");
+      setTokenDisplay();
+    });
+
+    byId("health-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/healthz", {}, false);
+        byId("health-raw").textContent = pretty(data);
+        setStatus("health-status", "Health check succeeded.", "success");
+      } catch (error) {
+        byId("health-raw").textContent = pretty(error.payload || { message: error.message });
+        setStatus("health-status", error.message, "error");
+      }
+    });
+
+    byId("bootstrap-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/v1/ui/bootstrap");
+        state.bootstrap = data;
+        byId("bootstrap-summary").textContent = pretty(data);
+        asset("ca", "bootstrap", "ready", "Broker bootstrap summary", `${data.public_base_url} | user TTL ${data.default_user_ttl_hours}h | host TTL ${data.default_host_ttl_hours}h`);
+        setStatus("health-status", "Bootstrap summary loaded.", "success");
+      } catch (error) {
+        byId("bootstrap-summary").textContent = pretty(error.payload || { message: error.message });
+        asset("ca", "bootstrap", "error", "Broker bootstrap summary", error.message);
+        setStatus("health-status", error.message, "error");
+      }
+    });
+
+    byId("fetch-user-ca-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/v1/ca/user/pubkey");
+        byId("user-ca-output").textContent = data.public_key;
+        asset("server", "user-ca-pubkey", "ready", "User CA public key", data.public_key);
+        setStatus("pubkey-status", "User CA public key loaded.", "success");
+      } catch (error) {
+        byId("user-ca-output").textContent = pretty(error.payload || { message: error.message });
+        asset("server", "user-ca-pubkey", "error", "User CA public key", error.message);
+        setStatus("pubkey-status", error.message, "error");
+      }
+    });
+
+    byId("fetch-host-ca-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/v1/ca/host/pubkey");
+        byId("host-ca-output").textContent = data.public_key;
+        asset("client", "host-ca-pubkey", "ready", "Host CA public key", data.public_key);
+        setStatus("pubkey-status", "Host CA public key loaded.", "success");
+      } catch (error) {
+        byId("host-ca-output").textContent = pretty(error.payload || { message: error.message });
+        asset("client", "host-ca-pubkey", "error", "Host CA public key", error.message);
+        setStatus("pubkey-status", error.message, "error");
+      }
+    });
+
+    byId("demo-user-key-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/v1/ui/demo-user-pubkey", { method: "POST" });
+        byId("user-public-key").value = data.public_key;
+        asset("client", "user-pubkey", "ready", "User public key", data.public_key);
+        setStatus("user-status", "Demo user public key generated and filled in.", "success");
+      } catch (error) {
+        asset("client", "user-pubkey", "error", "User public key", error.message);
+        setStatus("user-status", error.message, "error");
+      }
+    });
+
+    byId("demo-host-key-btn").addEventListener("click", async () => {
+      try {
+        const data = await api("/v1/ui/demo-host-pubkey", { method: "POST" });
+        byId("host-public-key").value = data.public_key;
+        asset("server", "host-pubkey", "ready", "Host public key", data.public_key);
+        setStatus("host-status", "Demo host public key generated and filled in.", "success");
+      } catch (error) {
+        asset("server", "host-pubkey", "error", "Host public key", error.message);
+        setStatus("host-status", error.message, "error");
+      }
+    });
+
+    byId("sign-user-btn").addEventListener("click", async () => {
+      const payload = {
+        public_key: byId("user-public-key").value.trim(),
+        key_id: byId("user-key-id").value.trim(),
+        requested_principals: principalsFromInput(byId("user-principals").value),
+        ttl: byId("user-ttl").value.trim(),
+        caller: {
+          requester: byId("user-caller-requester").value.trim(),
+          source_ip: byId("user-caller-source").value.trim() || null,
+          reason: byId("user-caller-reason").value.trim() || null,
+        },
+      };
+      try {
+        const data = await api("/v1/sign/user", { method: "POST", body: JSON.stringify(payload) });
+        state.userResponse = data;
+        byId("user-cert-output").textContent = data.certificate;
+        byId("user-raw-output").textContent = pretty(data);
+        asset("client", "user-cert", "ready", "User certificate", `${data.key_id} | principals=${data.principals.join(", ")} | ttl=${data.ttl}`);
+        setStatus("user-status", `User certificate signed. idempotent_reused=${data.idempotent_reused}`, "success");
+      } catch (error) {
+        byId("user-raw-output").textContent = pretty(error.payload || { message: error.message });
+        asset("client", "user-cert", "error", "User certificate", error.message);
+        setStatus("user-status", error.message, "error");
+      }
+    });
+
+    byId("inspect-user-btn").addEventListener("click", () => {
+      inspectCertificate(state.userResponse && state.userResponse.certificate, "user-cert-summary", "user-status");
+    });
+
+    byId("sign-host-btn").addEventListener("click", async () => {
+      const payload = {
+        public_key: byId("host-public-key").value.trim(),
+        key_id: byId("host-key-id").value.trim(),
+        requested_principals: principalsFromInput(byId("host-principals").value),
+        ttl: byId("host-ttl").value.trim(),
+        caller: {
+          requester: byId("host-caller-requester").value.trim(),
+          source_ip: byId("host-caller-source").value.trim() || null,
+          reason: byId("host-caller-reason").value.trim() || null,
+        },
+      };
+      try {
+        const data = await api("/v1/sign/host", { method: "POST", body: JSON.stringify(payload) });
+        state.hostResponse = data;
+        byId("host-cert-output").textContent = data.certificate;
+        byId("host-raw-output").textContent = pretty(data);
+        asset("server", "host-cert", "ready", "Host certificate", `${data.key_id} | principals=${data.principals.join(", ")} | ttl=${data.ttl}`);
+        setStatus("host-status", `Host certificate signed. idempotent_reused=${data.idempotent_reused}`, "success");
+      } catch (error) {
+        byId("host-raw-output").textContent = pretty(error.payload || { message: error.message });
+        asset("server", "host-cert", "error", "Host certificate", error.message);
+        setStatus("host-status", error.message, "error");
+      }
+    });
+
+    byId("inspect-host-btn").addEventListener("click", () => {
+      inspectCertificate(state.hostResponse && state.hostResponse.certificate, "host-cert-summary", "host-status");
+    });
+
+    renderRuntimeState();
+    setTokenDisplay();
+  </script>
+</body>
+</html>

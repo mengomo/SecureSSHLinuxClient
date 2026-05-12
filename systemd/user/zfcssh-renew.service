@@ -1,0 +1,6 @@
+[Unit]
+Description=Renew SecureSSH user certificate when needed
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/zfcssh renew --if-needed

@@ -1,0 +1,18 @@
+[Unit]
+Description=ZFCS Secure SSH HTTP Broker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/zfcssh-broker
+EnvironmentFile=/opt/zfcssh-broker/.env
+ExecStart=/opt/zfcssh-broker/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

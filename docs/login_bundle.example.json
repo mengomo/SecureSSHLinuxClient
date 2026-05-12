@@ -1,0 +1,27 @@
+{
+  "bundle_id": "alice-laptop",
+  "broker_url": "https://broker.example.internal",
+  "mtls": {
+    "client_certificate_pem": "-----BEGIN CERTIFICATE-----\nREPLACE_WITH_CLIENT_CERT\n-----END CERTIFICATE-----",
+    "client_key_pem": "-----BEGIN PRIVATE KEY-----\nREPLACE_WITH_CLIENT_KEY\n-----END PRIVATE KEY-----",
+    "ca_certificate_pem": "-----BEGIN CERTIFICATE-----\nREPLACE_WITH_BROKER_CA_CERT\n-----END CERTIFICATE-----"
+  },
+  "ssh": {
+    "host_patterns": [
+      "soc.example.internal"
+    ],
+    "default_principals": [
+      "root"
+    ],
+    "default_profile": "field_operation",
+    "allowed_profiles": [
+      "field_operation",
+      "claims_warranty"
+    ],
+    "key_id": "alice@laptop"
+  },
+  "identity": {
+    "requester": "alice",
+    "reason": "field diagnostics"
+  }
+}

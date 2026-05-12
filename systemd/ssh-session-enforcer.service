@@ -1,0 +1,9 @@
+[Unit]
+Description=SSH Session Enforcer – terminate sessions with expired certificates
+After=sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ssh_session_enforcer.sh
+# needs root to read /proc/*/environ and kill sshd children
+User=root

@@ -1,0 +1,186 @@
+# ==========================================
+# ZFCS Secure SSH – Production sshd_config
+# ==========================================
+# 本配置面向 SSH CA 证书认证体系，结合生命周期感知的权限管理。
+#
+# CA 在签发用户证书时嵌入两类 principal：
+#   1. 用户 principal  — 对应 Linux 账户名（如 rocky, root）
+#   2. 生命周期 principal — lc:<阶段名> 标识所属阶段
+#
+# 生命周期阶段 (principal)       | 说明
+# -------------------------------|-----------------------------
+AuthenticationMethods publickey
+# lc:development                 | 开发阶段 — 全功能访问
+# lc:zf_production               | ZF 生产阶段 — 产线终端
+# lc:oem_production              | OEM 生产阶段 — OEM 集成产线
+# lc:field_operation              | 现场运维（默认）— 日常运维
+# lc:claims_warranty             | 索赔/保修 — RMA 诊断
+# lc:end_of_life                 | 生命周期终止 — 退役设备只读
+#
+# sshd 通过 AuthorizedPrincipalsCommand 脚本同时检查：
+#   - 用户 principal 是否匹配目标 Linux 账户
+#   - lc:* principal 是否在本机允许的生命周期阶段列表中
+#
+# 服务器管理员只需编辑 /etc/ssh/allowed_lifecycle_stages 即可
+# 控制本机接受哪些阶段的用户登录，无需创建额外用户组。
+#
+# ── 前置准备 ──────────────────────────────────────────────────────────────────
+# 1. 将 User CA 公钥放置到 /etc/ssh/trusted_user_ca_keys.pub
+# 2. 创建 /etc/ssh/allowed_lifecycle_stages，每行写一个允许的阶段：
+#      echo "lc:field_operation" > /etc/ssh/allowed_lifecycle_stages
+#      echo "lc:development"   >> /etc/ssh/allowed_lifecycle_stages
+# 3. 安装 authorized_principals_command.sh 脚本：
+#      cp scripts/authorized_principals_command.sh /usr/local/bin/
+#      chmod 755 /usr/local/bin/authorized_principals_command.sh
+#      chown root:root /usr/local/bin/authorized_principals_command.sh
+# 4. 创建 KRL 文件（首次可为空）：
+#      ssh-keygen -kf /etc/ssh/revoked_keys
+# 5. 创建登录横幅（可选）：
+#      echo "Authorized access only. All activity is logged." \
+#        > /etc/ssh/banner.txt
+# ==========================================
+
+# ── Network ──────────────────────────────────────────────────────────────────
+Port 22
+AddressFamily any
+ListenAddress 0.0.0.0
+
+# ── Host Keys & Host Certificate ─────────────────────────────────────────────
+# 主机私钥和 CA 签发的主机证书共同向客户端证明服务器身份。
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# ── Authentication ───────────────────────────────────────────────────────────
+LoginGraceTime 1m
+PermitRootLogin prohibit-password
+StrictModes yes
+MaxAuthTries 3
+MaxSessions 5
+
+# ── Public Key / Certificate Authentication ──────────────────────────────────
+PubkeyAuthentication yes
+
+# 信任 User CA — 所有由此 CA 签名的证书均被接受。
+# 具体的权限由证书中的 extensions、critical options、principals 和 TTL 控制。
+TrustedUserCAKeys /etc/ssh/trusted_user_ca_keys.pub
+
+# 将认证证书暴露到每个会话的临时文件中。
+# session enforcer 脚本需要此项来检查活跃会话的证书过期时间。
+# 如果缺失，session enforcer 应视为配置错误并直接失败。
+ExposeAuthInfo yes
+
+# ── 基于 Principal 的生命周期访问控制 ─────────────────────────────────────────
+# AuthorizedPrincipalsCommand 替代静态的 AuthorizedPrincipalsFile。
+# sshd 每次认证时调用此脚本，传入目标用户名 (%u) 和证书指纹 (%f)
+# 以及证书内的 principal 列表 (%k 为用户公钥/证书)。
+#
+# 脚本的职责：
+#   1. 提取证书中所有 principal
+#   2. 检查是否包含目标用户名的 principal
+#   3. 检查 lc:* principal 是否在 /etc/ssh/allowed_lifecycle_stages 中
+#   4. 缺省拒绝：allowed_lifecycle_stages 缺失、为空或证书包含多个 lc:* principal 时都拒绝
+#   5. 其余条件均匹配 → 输出允许的 principal → sshd 放行
+#      不匹配 → 无输出 → sshd 拒绝
+#
+# 参数说明：
+#   %u = 目标 Linux 用户名
+#   %t = 证书密钥类型（如 ssh-ed25519-cert-v01@openssh.com）
+#   %k = Base64 编码的证书/公钥
+AuthorizedPrincipalsCommand /usr/local/bin/authorized_principals_command.sh %u %t %k
+AuthorizedPrincipalsCommandUser nobody
+
+# 如需回退到静态 principal 文件（不使用生命周期判断），取消注释以下行
+# 并注释掉上方的 AuthorizedPrincipalsCommand：
+# AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+
+# 紧急非 CA 访问的 fallback（可选，生产环境建议注释掉以强制仅 CA 登录）
+#AuthorizedKeysFile .ssh/authorized_keys
+
+# ── Key Revocation List (KRL) ────────────────────────────────────────────────
+# 用于紧急吊销未过期证书。将证书序列号加入 KRL 后立即生效。
+#
+# 创建空 KRL：
+#   ssh-keygen -kf /etc/ssh/revoked_keys
+#
+# 吊销指定证书：
+#   ssh-keygen -kf /etc/ssh/revoked_keys -s /etc/ssh/trusted_user_ca_keys.pub \
+#     -z <序列号> <证书文件>
+#
+# 吊销指定序列号范围：
+#   ssh-keygen -kf /etc/ssh/revoked_keys -s /etc/ssh/trusted_user_ca_keys.pub \
+#     -u -z <起始>:<结束>
+#
+# 注意：此文件必须存在，否则 sshd 拒绝启动。首次部署时创建空 KRL。
+RevokedKeys /etc/ssh/revoked_keys
+
+# ── Disable Password Authentication ─────────────────────────────────────────
+# 全部通过 CA 签发的证书访问。
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+
+# ── Disable Other Auth Methods ───────────────────────────────────────────────
+HostbasedAuthentication no
+IgnoreRhosts yes
+KerberosAuthentication no
+GSSAPIAuthentication no
+
+# ── Certificate Extensions 与 sshd 配置的交互关系 ────────────────────────────
+# 以下能力由证书中的 extensions 和 sshd 配置 **取交集** 生效：
+#
+#   证书 extension           | sshd 指令            | 实际效果
+#   -------------------------|----------------------|------------------------
+#   permit-pty               | PermitTTY            | 两者都 yes 才有 PTY
+#   permit-port-forwarding   | AllowTcpForwarding   | 两者都 yes 才能转发
+#   permit-agent-forwarding  | AllowAgentForwarding | 两者都 yes 才能代理
+#   permit-X11-forwarding    | X11Forwarding        | 两者都 yes 才能 X11
+#   permit-user-rc           | (无对应指令)          | 仅由证书控制
+#
+# Critical options（强制限制）：
+#   force-command=<cmd>      → 只能执行指定命令
+#   source-address=<CIDRs>   → 只接受指定 IP 段的连接
+#
+# 策略：在 sshd 层面设为 ALLOW，让证书配置成为唯一权限控制点。
+# 这样不同生命周期阶段的证书自动获得不同权限。
+
+AllowAgentForwarding yes
+AllowTcpForwarding yes
+X11Forwarding no
+PermitTTY yes
+
+# ── Session Hardening ────────────────────────────────────────────────────────
+PrintMotd yes
+PrintLastLog yes
+TCPKeepAlive yes
+ClientAliveInterval 300
+ClientAliveCountMax 3
+MaxStartups 10:30:100
+PermitTunnel no
+PermitUserEnvironment no
+UseDNS no
+UsePAM yes
+
+# ── Banner ───────────────────────────────────────────────────────────────────
+# 登录前显示法律声明/警告信息。
+# 创建文件内容示例：
+#   ┌───────────────────────────────────────────────────┐
+#   │ WARNING: Authorized access only.                  │
+#   │ All sessions are monitored, recorded, and audited │
+#   │ Unauthorized access will be prosecuted.           │
+#   └───────────────────────────────────────────────────┘
+Banner /etc/ssh/banner.txt
+
+# ── Crypto Hardening ─────────────────────────────────────────────────────────
+# 限制为强加密算法集，禁用遗留弱算法。
+Ciphers aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp384
+HostKeyAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com
+PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com
+
+# ── SFTP ─────────────────────────────────────────────────────────────────────
+Subsystem sftp /usr/libexec/sftp-server
